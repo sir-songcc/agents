@@ -1,1 +1,494 @@
-<html><body><h1>Test Agent Portal</h1></body></html>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>代理1 - 卡密查询端</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0f1923; color:#e0e0e0; font-family:'Segoe UI',sans-serif; padding:20px; }
+.spinner { display:inline-block; width:18px; height:18px; border:2px solid #2d3e50; border-top-color:#4fc3f7; border-radius:50%; animation:spin 0.8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.loading-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:300; justify-content:center; align-items:center; }
+.loading-overlay .box { background:#1a2a3a; border-radius:12px; padding:30px 40px; display:flex; align-items:center; gap:12px; font-size:14px; color:#4fc3f7; }
+.login-box { max-width:400px; margin:80px auto; background:#1a2a3a; border-radius:12px; padding:30px; }
+.login-box h1 { text-align:center; margin-bottom:20px; font-size:20px; color:#4fc3f7; }
+.login-box input { width:100%; padding:12px; margin-bottom:15px; background:#0f1923; border:1px solid #2d3e50; border-radius:6px; color:#e0e0e0; font-size:14px; }
+.login-box button { width:100%; padding:12px; background:#00b894; color:white; border:none; border-radius:6px; cursor:pointer; font-size:15px; display:flex; align-items:center; justify-content:center; gap:8px; }
+.login-box button:hover { background:#00cec9; }
+.login-box button:disabled { opacity:0.6; cursor:default; }
+.login-box .error { color:#e17055; text-align:center; margin-bottom:10px; font-size:13px; }
+.main { max-width:1100px; margin:0 auto; display:none; }
+.header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+.header h1 { font-size:22px; color:#4fc3f7; }
+.header button { background:#2d3e50; color:#dfe6e9; padding:8px 16px; border:1px solid #3a4a5a; border-radius:6px; cursor:pointer; font-size:13px; display:inline-flex; align-items:center; gap:6px; }
+.header button:hover { background:#3a4a5a; }
+.stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
+.stat-card { background:#1a2a3a; border-radius:8px; padding:15px; text-align:center; }
+.stat-card .num { font-size:28px; font-weight:bold; }
+.stat-card .label { font-size:13px; color:#636e72; margin-top:5px; }
+.stat-card.blue .num { color:#4fc3f7; }
+.stat-card.green .num { color:#00b894; }
+.stat-card.yellow .num { color:#fdcb6e; }
+.stat-card.red .num { color:#e17055; }
+.toolbar { display:flex; gap:10px; margin-bottom:15px; flex-wrap:wrap; }
+.toolbar button { padding:8px 16px; border:none; border-radius:6px; cursor:pointer; font-size:13px; }
+.btn-primary { background:#0984e3; color:white; }
+.btn-primary:hover { background:#74b9ff; }
+.btn-danger { background:#d63031; color:white; }
+.btn-danger:hover { background:#e17055; }
+.btn-success { background:#00b894; color:white; }
+.btn-purple { background:#6c5ce7; color:white; }
+.btn-purple:hover { background:#a29bfe; }
+.search-bar { display:flex; gap:10px; margin-bottom:15px; flex-wrap:wrap; }
+.search-bar input, .search-bar select { padding:10px; background:#0f1923; border:1px solid #2d3e50; border-radius:6px; color:#e0e0e0; }
+.search-bar input { flex:1; }
+table { width:100%; border-collapse:collapse; background:#1a2a3a; border-radius:8px; overflow:hidden; }
+th { background:#2d3e50; padding:10px; text-align:left; font-size:13px; color:#636e72; }
+td { padding:10px; border-top:1px solid #2d3e50; font-size:13px; }
+.badge { padding:3px 8px; border-radius:4px; font-size:12px; }
+.badge.unused { background:#1a3a2a; color:#00b894; }
+.badge.used { background:#1a2a3a; color:#4fc3f7; }
+.badge.expired { background:#3a1a1a; color:#e17055; }
+.loading-cell { text-align:center; padding:40px; color:#636e72; }
+.copy-btn { background:#2d3e50; color:#dfe6e9; padding:2px 8px; border:1px solid #3a4a5a; border-radius:4px; cursor:pointer; font-size:11px; margin-left:6px; }
+.copy-btn:hover { background:#3a4a5a; }
+.pager { display:flex; gap:8px; justify-content:center; align-items:center; margin-top:15px; }
+.pager button { padding:6px 12px; background:#2d3e50; color:#dfe6e9; border:1px solid #3a4a5a; border-radius:4px; cursor:pointer; font-size:13px; }
+.pager button:disabled { opacity:0.4; cursor:default; }
+.pager button.cur { background:#0984e3; color:white; border-color:#0984e3; }
+.pager .info { color:#636e72; font-size:13px; }
+.modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:100; justify-content:center; align-items:center; }
+.modal-box { background:#1a2a3a; border-radius:12px; padding:25px; width:420px; max-height:80vh; overflow-y:auto; }
+.modal-box.wide { width:600px; }
+.modal-box h2 { color:#4fc3f7; margin-bottom:15px; font-size:18px; }
+.modal-box label { display:block; margin-bottom:5px; font-size:13px; color:#636e72; }
+.modal-box input, .modal-box select, .modal-box textarea { width:100%; padding:10px; margin-bottom:12px; background:#0f1923; border:1px solid #2d3e50; border-radius:6px; color:#e0e0e0; font-size:14px; }
+.modal-box textarea { resize:vertical; min-height:60px; }
+.modal-box .btns { display:flex; gap:10px; justify-content:flex-end; }
+.modal-box .btns button { padding:8px 20px; border:none; border-radius:6px; cursor:pointer; font-size:14px; }
+.req-item { background:#0f1923; border-radius:6px; padding:12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
+.req-item.pending { border-left:3px solid #fdcb6e; }
+.req-item.approved { border-left:3px solid #00b894; }
+.req-item.rejected { border-left:3px solid #e17055; }
+.req-item .req-info { font-size:13px; color:#dfe6e9; }
+.req-item .req-status { font-size:12px; padding:3px 10px; border-radius:4px; }
+.req-item .req-status.pending { background:#3a3520; color:#fdcb6e; }
+.req-item .req-status.approved { background:#1a3a2a; color:#00b894; }
+.req-item .req-status.rejected { background:#3a1a1a; color:#e17055; }
+.toast { position:fixed; top:20px; right:20px; padding:12px 20px; border-radius:6px; color:white; font-size:14px; z-index:200; display:none; }
+.toast.success { background:#00b894; }
+.toast.error { background:#e17055; }
+.toast.info { background:#0984e3; }
+</style>
+</head>
+<body>
+<div class="loading-overlay" id="loadingOverlay"><div class="box"><div class="spinner"></div><span id="loadingText">加载中...</span></div></div>
+<div class="login-box" id="loginBox">
+    <h1>代理1 卡密查询端</h1>
+    <div class="error" id="loginError" style="display:none;"></div>
+    <input type="password" id="pwdInput" placeholder="请输入代理密码" onkeypress="if(event.key==='Enter')doLogin()">
+    <button id="loginBtn" onclick="doLogin()">登录查看</button>
+</div>
+<div class="main" id="mainBox">
+    <div class="header">
+        <h1>代理1 卡密查询端</h1>
+        <div style="display:flex;gap:8px;">
+            <button onclick="refresh()" id="refreshBtn">刷新数据</button>
+            <button class="btn-purple" onclick="showReqModal()" style="background:#6c5ce7;color:white;">申请记录</button>
+        </div>
+    </div>
+    <div class="stats">
+        <div class="stat-card blue"><div class="num" id="stTotal">-</div><div class="label">总卡密</div></div>
+        <div class="stat-card green"><div class="num" id="stUnused">-</div><div class="label">未使用</div></div>
+        <div class="stat-card yellow"><div class="num" id="stUsed">-</div><div class="label">已使用</div></div>
+        <div class="stat-card red"><div class="num" id="stExpired">-</div><div class="label">已过期</div></div>
+    </div>
+    <div class="toolbar">
+        <button class="btn-primary" onclick="showGenModal()">申请生成卡密</button>
+        <button class="btn-danger" onclick="showDelModal()">申请删除卡密</button>
+    </div>
+    <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="搜索卡密..." oninput="onSearchChange()">
+        <select id="filterStatus" onchange="renderTable()">
+            <option value="">全部状态</option>
+            <option value="unused">未使用</option>
+            <option value="used">已使用</option>
+            <option value="expired">已过期</option>
+        </select>
+        <select id="filterDays" onchange="renderTable()">
+            <option value="">全部时长</option>
+            <option value="1">1天</option>
+            <option value="7">7天</option>
+            <option value="30">30天</option>
+            <option value="365">365天</option>
+            <option value="99998">8小时</option>
+            <option value="99999">永久</option>
+        </select>
+    </div>
+    <table>
+        <thead><tr><th>卡密</th><th>状态</th><th>时长</th><th>应用</th><th>激活时间</th><th>到期时间</th></tr></thead>
+        <tbody id="tableBody"><tr><td colspan="6"><div class="loading-cell">加载中...</div></td></tr></tbody>
+    </table>
+    <div class="pager" id="pager"></div>
+</div>
+<!-- 生成申请弹窗 -->
+<div class="modal-overlay" id="genModal">
+    <div class="modal-box">
+        <h2>申请生成卡密</h2>
+        <label>选择应用</label>
+        <select id="genApp"><option value="SJZ003">三角洲</option></select>
+        <label>卡密时长</label>
+        <select id="genDays">
+            <option value="1">1天</option>
+            <option value="7">7天</option>
+            <option value="30">30天</option>
+            <option value="365">365天</option>
+            <option value="99998">8小时</option>
+            <option value="99999">永久</option>
+        </select>
+        <label>生成数量 (1-1000)</label>
+        <input type="number" id="genCount" value="10" min="1" max="1000">
+        <label>备注说明（可选）</label>
+        <textarea id="genNote" placeholder="如：新客户需要..."></textarea>
+        <div class="btns">
+            <button onclick="closeModal('genModal')" style="background:#2d3e50;color:#dfe6e9;">取消</button>
+            <button class="btn-primary" onclick="submitGenRequest()">提交申请</button>
+        </div>
+    </div>
+</div>
+<!-- 删除申请弹窗 -->
+<div class="modal-overlay" id="delModal">
+    <div class="modal-box">
+        <h2>申请删除卡密</h2>
+        <label>输入要删除的卡密</label>
+        <input type="text" id="delKeyInput" placeholder="输入卡密搜索..." oninput="searchDelKey()" autocomplete="off">
+        <div id="delSearchResult" style="max-height:200px;overflow-y:auto;margin-bottom:12px;"></div>
+        <div id="delSelected" style="display:none;background:#1a3a2a;border-radius:6px;padding:10px;margin-bottom:12px;">
+            <span style="color:#00b894;">已选中: </span><span id="delSelectedKey" style="font-family:Consolas,monospace;"></span>
+            <button onclick="clearDelSelect()" style="float:right;background:#e17055;color:white;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;">取消选择</button>
+        </div>
+        <label>删除理由（必填）</label>
+        <textarea id="delReason" placeholder="如：客户退款、卡密错误等"></textarea>
+        <div class="btns">
+            <button onclick="closeModal('delModal')" style="background:#2d3e50;color:#dfe6e9;">取消</button>
+            <button class="btn-danger" onclick="submitDelRequest()">提交申请</button>
+        </div>
+    </div>
+</div>
+<!-- 申请记录弹窗 -->
+<div class="modal-overlay" id="reqModal">
+    <div class="modal-box wide">
+        <h2>我的申请记录</h2>
+        <div id="reqList" style="margin-bottom:15px;"><div class="loading-cell">加载中...</div></div>
+        <div class="btns">
+            <button onclick="clearMyRequests()" style="background:#e17055;color:white;">清理记录</button>
+            <button onclick="closeModal('reqModal')" style="background:#2d3e50;color:#dfe6e9;">关闭</button>
+        </div>
+    </div>
+</div>
+<div class="toast" id="toastEl"></div>
+<script>
+const EDGE_URL = "https://jckainqeeomkxabklojw.supabase.co/functions/v1/agent-view";
+const ANON_KEY = "sb_publishable_0cjeHPbLdSb4KjAl3x634w_-T76BUfv";
+const AGENT_ID = "agent1";
+const APP_LIST = [{"id":"SJZ003","name":"三角洲"}];
+const PAGE_SIZE = 20;
+let allKeys = [];
+let allRequests = [];
+let agentPwd = '';
+let curPage = 1;
+let filteredKeys = [];
+
+function showToast(msg, type) {
+    var t = document.getElementById('toastEl');
+    t.textContent = msg;
+    t.className = 'toast ' + (type||'info');
+    t.style.display = 'block';
+    setTimeout(function(){ t.style.display = 'none'; }, 3000);
+}
+
+function showLoading(text) {
+    document.getElementById('loadingText').textContent = text || '加载中...';
+    document.getElementById('loadingOverlay').style.display = 'flex';
+}
+function hideLoading() { document.getElementById('loadingOverlay').style.display = 'none'; }
+
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+async function doLogin() {
+    var pwd = document.getElementById('pwdInput').value;
+    if (!pwd) return;
+    agentPwd = pwd;
+    document.getElementById('loginError').style.display = 'none';
+    document.getElementById('loginError').textContent = '';
+    var btn = document.getElementById('loginBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div> 登录中...';
+    await fetchData(true);
+    btn.disabled = false;
+    btn.innerHTML = '登录查看';
+}
+
+async function fetchData(isLogin) {
+    if (isLogin) showLoading('正在登录...'); else showLoading('正在刷新...');
+    try {
+        var resp = await fetch(EDGE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON_KEY },
+            body: JSON.stringify({ agent: AGENT_ID, password: agentPwd })
+        });
+        var data = await resp.json();
+        hideLoading();
+        if (data.error) {
+            document.getElementById('loginError').textContent = data.error;
+            document.getElementById('loginError').style.display = 'block';
+            document.getElementById('loginBox').style.display = 'block';
+            document.getElementById('mainBox').style.display = 'none';
+            return;
+        }
+        allKeys = data.keys || [];
+        allRequests = data.requests || [];
+        document.getElementById('loginBox').style.display = 'none';
+        document.getElementById('mainBox').style.display = 'block';
+        renderStats(data.stats);
+        curPage = 1;
+        renderTable();
+    } catch(e) {
+        hideLoading();
+        document.getElementById('loginError').textContent = '网络错误，请检查网络连接';
+        document.getElementById('loginError').style.display = 'block';
+    }
+}
+
+function renderStats(stats) {
+    document.getElementById('stTotal').textContent = stats.total;
+    document.getElementById('stUnused').textContent = stats.unused;
+    document.getElementById('stUsed').textContent = stats.used;
+    document.getElementById('stExpired').textContent = stats.expired;
+}
+
+function fmtDays(d) {
+    if (d === 99999) return '永久';
+    if (d === 99998) return '8小时';
+    return d + '天';
+}
+
+function fmtTime(ts) {
+    if (!ts) return '-';
+    if (typeof ts === 'string') {
+        if (ts.indexOf('Z') === -1 && ts.indexOf('+') === -1) ts = ts + 'Z';
+        return new Date(ts).toLocaleString('zh-CN', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+    }
+    return new Date(ts * 1000).toLocaleString('zh-CN', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+
+function copyKey(k) {
+    navigator.clipboard.writeText(k).then(function(){ showToast('已复制: ' + k, 'success'); });
+}
+
+var searchTimer = null;
+function onSearchChange() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function(){ curPage = 1; renderTable(); }, 300);
+}
+
+function getFiltered() {
+    var q = document.getElementById('searchInput').value.toLowerCase();
+    var fs = document.getElementById('filterStatus').value;
+    var fd = document.getElementById('filterDays').value;
+    return allKeys.filter(function(k) {
+        if (q && k.key.toLowerCase().indexOf(q) === -1) return false;
+        if (fs && k.status !== fs) return false;
+        if (fd && String(k.days) !== fd) return false;
+        return true;
+    });
+}
+
+function renderTable() {
+    filteredKeys = getFiltered();
+    var totalPages = Math.ceil(filteredKeys.length / PAGE_SIZE) || 1;
+    if (curPage > totalPages) curPage = totalPages;
+    var start = (curPage - 1) * PAGE_SIZE;
+    var pageData = filteredKeys.slice(start, start + PAGE_SIZE);
+
+    var tbody = document.getElementById('tableBody');
+    if (pageData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="loading-cell">暂无数据</td></tr>';
+    } else {
+        tbody.innerHTML = pageData.map(function(k) {
+            var sc = k.status === 'unused' ? 'unused' : (k.status === 'expired' ? 'expired' : 'used');
+            var stx = k.status === 'unused' ? '未使用' : (k.status === 'expired' ? '已过期' : '已使用');
+            return '<tr>' +
+                '<td style="font-family:Consolas,monospace;">' + k.key + '<button class="copy-btn" onclick="copyKey(\''+k.key+'\')">复制</button></td>' +
+                '<td><span class="badge ' + sc + '">' + stx + '</span></td>' +
+                '<td>' + fmtDays(k.days) + '</td>' +
+                '<td>' + (k.app_name || '-') + '</td>' +
+                '<td>' + (k.activated_at ? fmtTime(k.activated_at) : '-') + '</td>' +
+                '<td>' + (k.expire_time ? fmtTime(k.expire_time) : '-') + '</td>' +
+                '</tr>';
+        }).join('');
+    }
+    renderPager(totalPages);
+}
+
+function renderPager(totalPages) {
+    var p = document.getElementById('pager');
+    if (totalPages <= 1) { p.innerHTML = '<span class="info">共 ' + filteredKeys.length + ' 条</span>'; return; }
+    var html = '';
+    html += '<button onclick="goPage(1)"' + (curPage<=1?' disabled':'') + '>首页</button>';
+    html += '<button onclick="goPage(' + (curPage-1) + ')"' + (curPage<=1?' disabled':'') + '>上一页</button>';
+    var s = Math.max(1, curPage - 2);
+    var e = Math.min(totalPages, s + 4);
+    s = Math.max(1, e - 4);
+    for (var i = s; i <= e; i++) {
+        html += '<button class="' + (i===curPage?'cur':'') + '" onclick="goPage(' + i + ')">' + i + '</button>';
+    }
+    html += '<button onclick="goPage(' + (curPage+1) + ')"' + (curPage>=totalPages?' disabled':'') + '>下一页</button>';
+    html += '<button onclick="goPage(' + totalPages + ')"' + (curPage>=totalPages?' disabled':'') + '>末页</button>';
+    html += '<span class="info">第 ' + curPage + '/' + totalPages + ' 页 (共' + filteredKeys.length + '条)</span>';
+    p.innerHTML = html;
+}
+
+function goPage(p) { curPage = p; renderTable(); }
+
+function showReqModal() {
+    renderRequests();
+    document.getElementById('reqModal').style.display = 'flex';
+}
+
+function renderRequests() {
+    var list = document.getElementById('reqList');
+    if (!allRequests || allRequests.length === 0) {
+        list.innerHTML = '<div class="loading-cell">暂无申请记录</div>';
+        return;
+    }
+    list.innerHTML = allRequests.map(function(r) {
+        var typeText = r.type === 'gen' ? '生成' + r.count + '张' + fmtDays(r.days) + '卡密' : '删除卡密 ' + r.target_key;
+        var appText = r.app_name ? ' (' + r.app_name + ')' : '';
+        var reasonText = r.reason ? ' | 理由: ' + r.reason : '';
+        var statusText = r.status === 'pending' ? '等待审批' : (r.status === 'approved' ? '已通过' : '已拒绝');
+        var rejectText = r.reject_reason ? ' | 拒绝理由: ' + r.reject_reason : '';
+        return '<div class="req-item ' + r.status + '">' +
+            '<div class="req-info">' + typeText + appText + reasonText + rejectText + '<br><span style="color:#636e72;font-size:11px;">' + fmtTime(r.created_at) + '</span></div>' +
+            '<span class="req-status ' + r.status + '">' + statusText + '</span>' +
+            '</div>';
+    }).join('');
+}
+
+async function clearMyRequests() {
+    if (!allRequests || allRequests.length === 0) { showToast('暂无记录可清理', 'info'); return; }
+    if (!confirm('确认清理所有已处理的申请记录？（等待审批的不会被清理）')) return;
+    showLoading('正在清理...');
+    var cleared = 0;
+    for (var i = 0; i < allRequests.length; i++) {
+        var r = allRequests[i];
+        if (r.status !== 'pending') {
+            try {
+                var resp = await fetch(EDGE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON_KEY },
+                    body: JSON.stringify({ agent: AGENT_ID, password: agentPwd, action: 'clear_request', target_key: r.req_key || '' })
+                });
+                if (resp.ok) cleared++;
+            } catch(e) {}
+        }
+    }
+    hideLoading();
+    showToast('已清理 ' + cleared + ' 条记录', 'success');
+    await fetchData(false);
+    renderRequests();
+}
+
+function showGenModal() { document.getElementById('genModal').style.display = 'flex'; }
+
+var delSelectedKey = '';
+function showDelModal() {
+    document.getElementById('delKeyInput').value = '';
+    document.getElementById('delReason').value = '';
+    document.getElementById('delSearchResult').innerHTML = '';
+    document.getElementById('delSelected').style.display = 'none';
+    delSelectedKey = '';
+    document.getElementById('delModal').style.display = 'flex';
+}
+
+function searchDelKey() {
+    var q = document.getElementById('delKeyInput').value.trim().toLowerCase();
+    var container = document.getElementById('delSearchResult');
+    if (!q) { container.innerHTML = ''; return; }
+    var matches = allKeys.filter(function(k) { return k.key.toLowerCase().indexOf(q) !== -1; }).slice(0, 20);
+    if (matches.length === 0) { container.innerHTML = '<div style="color:#636e72;padding:8px;font-size:13px;">未找到匹配的卡密</div>'; return; }
+    container.innerHTML = matches.map(function(k) {
+        var stTxt = k.status === 'unused' ? '未使用' : (k.status === 'expired' ? '已过期' : '已使用');
+        var stColor = k.status === 'unused' ? '#00b894' : (k.status === 'expired' ? '#e17055' : '#4fc3f7');
+        var appTxt = k.app_name && k.app_name !== '-' ? ' (' + k.app_name + ')' : '';
+        return '<div onclick="selectDelKey(\''+k.key+'\')" style="padding:8px;cursor:pointer;border-bottom:1px solid #2d3e50;font-size:13px;" onmouseover="this.style.background=\'#2d3e50\'" onmouseout="this.style.background=\'none\'">' +
+            '<span style="font-family:Consolas,monospace;color:#dfe6e9;">'+k.key+'</span>' +
+            '<span style="color:#636e72;margin-left:8px;">'+fmtDays(k.days)+'</span>' +
+            '<span style="color:'+stColor+';margin-left:8px;">'+stTxt+'</span>' +
+            '<span style="color:#636e72;margin-left:8px;">'+appTxt+'</span></div>';
+    }).join('');
+}
+
+function selectDelKey(key) {
+    delSelectedKey = key;
+    document.getElementById('delSelectedKey').textContent = key;
+    document.getElementById('delSelected').style.display = 'block';
+    document.getElementById('delKeyInput').value = key;
+    document.getElementById('delSearchResult').innerHTML = '';
+}
+
+function clearDelSelect() {
+    delSelectedKey = '';
+    document.getElementById('delKeyInput').value = '';
+    document.getElementById('delSelected').style.display = 'none';
+    document.getElementById('delSearchResult').innerHTML = '';
+}
+
+async function submitGenRequest() {
+    var appId = document.getElementById('genApp').value;
+    var days = parseInt(document.getElementById('genDays').value);
+    var count = parseInt(document.getElementById('genCount').value);
+    var note = document.getElementById('genNote').value;
+    if (!appId || !days || !count || count < 1 || count > 1000) { showToast('请填写正确信息', 'error'); return; }
+    showLoading('提交中...');
+    try {
+        var resp = await fetch(EDGE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON_KEY },
+            body: JSON.stringify({ agent: AGENT_ID, password: agentPwd, action: 'gen_request', app_id: appId, days: days, count: count, note: note })
+        });
+        var data = await resp.json();
+        hideLoading();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast('生成申请已提交，等待管理员审批', 'success');
+        closeModal('genModal');
+        await fetchData(false);
+    } catch(e) { hideLoading(); showToast('提交失败', 'error'); }
+}
+
+async function submitDelRequest() {
+    var key = delSelectedKey;
+    var reason = document.getElementById('delReason').value.trim();
+    if (!key) { showToast('请选中需要删除的卡密', 'error'); return; }
+    if (!reason) { showToast('请填写删除理由', 'error'); return; }
+    showLoading('提交中...');
+    try {
+        var resp = await fetch(EDGE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON_KEY },
+            body: JSON.stringify({ agent: AGENT_ID, password: agentPwd, action: 'del_request', target_key: key, reason: reason })
+        });
+        var data = await resp.json();
+        hideLoading();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast('删除申请已提交，等待管理员审批', 'success');
+        closeModal('delModal');
+        await fetchData(false);
+    } catch(e) { hideLoading(); showToast('提交失败', 'error'); }
+}
+
+async function refresh() { await fetchData(false); showToast('数据已刷新', 'info'); }
+</script>
+</body>
+</html>
